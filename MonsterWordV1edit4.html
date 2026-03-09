@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monster-Word Game</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            background-color: #f4f9f4; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        
+        #game-board { 
+            width: 100%; 
+            max-width: 400px; 
+            height: 550px; 
+            background-color: #b8e994; 
+            border: 4px solid #2c3e50; 
+            border-radius: 20px; 
+            position: relative; 
+            overflow: hidden; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15); 
+        }
+
+        #start-screen, #end-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 16px;
+            box-sizing: border-box;
+            padding: 20px;
+        }
+
+        #end-screen {
+            z-index: 25;
+            display: none;
+            text-align: center;
+            justify-content: center;
+        }
+
+        #total-score-display {
+            position: absolute;
+            top: 20px;
+            font-size: 16px; 
+            font-weight: 900;
+            color: #d35400;
+            background: #fdebd0;
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 2px solid #e67e22;
+            box-shadow: 0 4px 0 rgba(230, 126, 34, 0.5);
+            z-index: 2;
+        }
+
+        #current-score-display {
+            position: absolute;
+            top: 55px; 
+            font-size: 13px;
+            font-weight: bold;
+            color: #555; 
+            display: none; 
+            z-index: 1;
+        }
+
+        #login-form {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 5px;
+            align-items: center;
+        }
+
+        #login-form input {
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid #2c3e50;
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            text-align: center;
+            outline: none;
+        }
+        
+        #username { width: 90px; }
+        #passcode { width: 60px; }
+
+        #login-btn {
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 900;
+            background-color: #f1c40f;
+            color: #2c3e50;
+            border: 2px solid #2c3e50;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #2c3e50;
+            transition: all 0.1s;
+        }
+        #login-btn:active {
+            transform: translateY(3px);
+            box-shadow: none;
+        }
+
+        #login-error {
+            color: #e74c3c;
+            font-size: 11px;
+            font-weight: bold;
+            background-color: #fadbd8;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #e74c3c;
+            display: none;
+            margin-bottom: 15px;
+        }
+
+        .credit-text {
+            position: absolute;
+            bottom: 10px;
+            font-size: 12px;
+            color: #7f8c8d;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #progress-bar-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 8px;
+            background: rgba(0,0,0,0.1);
+            z-index: 15;
+            display: none;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 100%;
+            transition: width 0.3s linear;
+        }
+
+        #score-board { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 14px 15px 10px 15px; 
+            font-weight: bold; 
+            font-size: 20px; 
+            color: #2c3e50; 
+            background: rgba(255,255,255,0.9); 
+            position: absolute; 
+            top: 0; 
+            width: 100%; 
+            z-index: 10; 
+            box-sizing: border-box; 
+            border-bottom: 2px solid #2c3e50; 
+        }
+
+        #monster {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 60px;
+            width: 60px; 
+            height: 60px;
+            transition: top 0.158s linear; 
+            z-index: 5;
+            filter: drop-shadow(0 4px 2px rgba(0,0,0,0.2));
+        }
+
+        #speech-bubble {
+            display: none;
+            position: absolute;
+            left: 55px; 
+            top: 50%;
+            transform: translateY(-50%);
+            background: #d4efdf; 
+            border: 2px solid #27ae60;
+            border-radius: 10px;
+            padding: 8px; 
+            font-size: 11px; 
+            font-weight: bold;
+            color: #2c3e50;
+            white-space: normal; 
+            width: 120px; 
+            text-align: center; 
+            line-height: 1.4;
+            z-index: 10;
+            box-shadow: 0 3px 0 rgba(0,0,0,0.1);
+        }
+
+        #speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 100%;
+            transform: translateY(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: transparent #27ae60 transparent transparent;
+        }
+
+        #egg-container { 
+            position: absolute; 
+            bottom: 120px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            text-align: center; 
+            z-index: 4;
+            width: 100%;
+        }
+        #egg { font-size: 50px; margin-bottom: 5px; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.15)); }
+        
+        #word { 
+            font-weight: 800; 
+            font-size: 14px; 
+            background: white; 
+            padding: 4px 15px; 
+            border-radius: 10px; 
+            border: 3px solid #2c3e50; 
+            color: #2c3e50; 
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1); 
+            display: inline-block;
+        }
+
+        #answers { 
+            position: absolute; 
+            bottom: 20px; 
+            width: 100%; 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            gap: 8px; 
+            padding: 0 15px; 
+            box-sizing: border-box;
+        }
+        
+        button.ans-btn { 
+            flex: 1 1 45%; 
+            padding: 8px 4px; 
+            font-size: 13px; 
+            font-weight: bold; 
+            border-radius: 10px; 
+            border: 2px solid #e74c3c; 
+            background-color: #ff7675; 
+            color: white; 
+            cursor: pointer; 
+            box-shadow: 0 3px 0 #c0392b; 
+            transition: all 0.1s; 
+        }
+        button.ans-btn:active { transform: translateY(3px); box-shadow: none; }
+        button.ans-btn:disabled { opacity: 0.8; cursor: not-allowed; transform: translateY(3px); box-shadow: none; }
+
+        .highlight-correct {
+            background-color: #2ecc71 !important; 
+            box-shadow: 0 0 10px #2ecc71, 0 3px 0 #27ae60 !important; 
+            color: white !important;
+            border-color: #27ae60 !important;
+        }
+
+        .mode-btn {
+            width: auto; 
+            padding: 12px 25px; 
+            font-size: 14px; 
+            font-weight: 900; 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        .mode-btn:active { transform: translateY(3px); box-shadow: none !important; }
+        
+        .mode-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            box-shadow: none !important;
+            transform: translateY(3px);
+        }
+
+        .small-btn {
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+            transition: all 0.1s;
+        }
+        .small-btn:active { transform: translateY(3px); box-shadow: none; }
+
+        .end-bubble {
+            background: white;
+            border: 3px solid #2c3e50;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            width: 90%;
+            box-sizing: border-box;
+        }
+
+        #end-mistakes {
+            width: 90%; 
+            max-height: 200px; 
+            overflow-y: auto; 
+            text-align: center; 
+            display: none;
+        }
+        
+        .mistake-bubble {
+            background-color: #f1c40f;
+            border-radius: 12px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 8px; height: 16px;
+            z-index: 30;
+            pointer-events: none;
+            border-radius: 2px;
+        }
+
+        #ranking-board {
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            border: 4px solid #2c3e50;
+            border-radius: 16px;
+            margin-top: 20px;
+            padding: 15px;
+            box-sizing: border-box;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        #ranking-board h3 {
+            margin-top: 0;
+            text-align: center;
+            color: #d35400;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 2px dashed #ecf0f1;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .ranking-item:last-child {
+            border-bottom: none;
+        }
+        .rank-name { color: #3498db; }
+        .rank-score { color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+<audio id="audio-bgm" src="bgm.mp3" loop preload="auto"></audio>
+<audio id="audio-chirp" src="chirp.mp3" preload="auto"></audio>
+<audio id="audio-laugh" src="laugh.mp3" preload="auto"></audio>
+
+<div id="game-board">
+    <div id="progress-bar-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div id="start-screen">
+        <div id="total-score-display">Highest Score: 0</div>
+        <div id="current-score-display">Recent Score: 0</div>
+        
+        <h1 style="color: #2c3e50; margin-top: 45px; margin-bottom: 15px; text-align: center; font-size: 34px; text-transform: uppercase; letter-spacing: 2px;">Monster-Word</h1>
+        
+        <img src="Your paragraph text.png" alt="Learn & Live English" style="width: 94px; height: 94px; object-fit: contain; margin-bottom: 15px;">
+
+        <div id="login-form">
+            <input type="text" id="username" maxlength="10" placeholder="Username">
+            <input type="password" id="passcode" maxlength="4" placeholder="Code">
+            <button id="login-btn" onclick="handleLogin()">LOGIN</button>
+        </div>
+        <div id="login-error"></div>
+
+        <div style="display: flex; gap: 15px; margin-top: 10px;">
+            <button id="btn-chart" class="mode-btn" disabled onclick="selectMode('chart')" style="background-color: #3498db; box-shadow: 0 4px 0 #2980b9;">CHART</button>
+            <button id="btn-scitech" class="mode-btn" disabled onclick="selectMode('scitech')" style="background-color: #2ecc71; box-shadow: 0 4px 0 #27ae60;">SCI-TECH</button>
+        </div>
+
+        <div class="credit-text">
+            Created by Yenba | Learn & Live English
+        </div>
+    </div>
+
+    <div id="end-screen">
+        <div class="end-bubble">
+            <h1 id="end-title" style="color: #e74c3c; margin-top: 0; font-size: 24px;"></h1>
+            <p id="end-message" style="font-size: 15px; font-weight: bold; color: #34495e; line-height: 1.5; margin-bottom: 15px;"></p>
+            
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="small-btn" onclick="goHome()" style="background-color: #95a5a6;">Trang chủ</button>
+                <button class="small-btn" onclick="playAgain()" style="background-color: #3498db;">Chơi lại</button>
+            </div>
+        </div>
+
+        <div id="end-mistakes">
+            <h4 style="margin: 0 0 10px 0; color: #d35400; font-size: 16px;">[Chú ý]</h4>
+            <div id="mistakes-list"></div>
+        </div>
+    </div>
+
+    <div id="score-board">
+        <span id="lives">❤️❤️❤️</span>
+        <span><span id="score">0</span> 🐥</span>
+    </div>
+
+    <div id="monster">
+        <div id="speech-bubble"><span id="speech-text"></span></div>
+        <svg width="60" height="60" viewBox="0 0 100 100">
+            <path d="M 25 50 Q 5 40 10 70" stroke="#ff6b81" stroke-width="7" stroke-linecap="round" fill="none"/>
+            <path d="M 75 50 Q 95 40 90 70" stroke="#ff6b81" stroke-width="7" stroke-linecap="round" fill="none"/>
+            <path d="M 20 80 L 20 40 C 20 10, 80 10, 80 40 L 80 80 Q 72.5 95 65 80 Q 57.5 65 50 80 Q 42.5 95 35 80 Q 27.5 65 20 80 Z" fill="#ff6b81" />
+            <circle cx="35" cy="45" r="5" fill="#2c3e50" />
+            <circle cx="65" cy="45" r="5" fill="#2c3e50" />
+            <path d="M 44 60 Q 50 66 56 60" stroke="#2c3e50" stroke-width="3" stroke-linecap="round" fill="none"/>
+            <polygon points="45,60 47,67 49,62" fill="white" stroke="#2c3e50" stroke-width="1.5" stroke-linejoin="round"/>
+            <polygon points="55,60 53,67 51,62" fill="white" stroke="#2c3e50" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+    </div>
+
+    <div id="egg-container">
+        <div id="egg">🥚</div>
+        <div id="word">...</div>
+    </div>
+    <div id="answers">
+        <button onclick="checkAnswer(0)" id="btn0" class="ans-btn">Đáp án 1</button>
+        <button onclick="checkAnswer(1)" id="btn1" class="ans-btn">Đáp án 2</button>
+        <button onclick="checkAnswer(2)" id="btn2" class="ans-btn">Đáp án 3</button>
+        <button onclick="checkAnswer(3)" id="btn3" class="ans-btn">Đáp án 4</button>
+    </div>
+</div>
+
+<div id="ranking-board">
+    <h3>🏆 Leaderboard 🏆</h3>
+    <div id="ranking-list">
+        <div style="text-align:center; color:#7f8c8d; font-size: 14px;">Đang tải dữ liệu...</div>
+    </div>
+</div>
+
+<script>
+    // Firebase Config đã được điền sẵn của bạn
+    const firebaseConfig = {
+        apiKey: "AIzaSyBcugXz141sgyyYSa0xiGyt6_1c3inzeCo",
+        authDomain: "monsterwordyb.firebaseapp.com",
+        projectId: "monsterwordyb",
+        storageBucket: "monsterwordyb.firebasestorage.app",
+        messagingSenderId: "538783970560",
+        appId: "1:538783970560:web:0b4852b33895dd49322fe5"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const chartVocab = [
+        { en: "Go up", vn: "Tăng lên", level: 1, group: "UP" },
+        { en: "Go down", vn: "Giảm xuống", level: 1, group: "DOWN" },
+        { en: "Rise", vn: "Tăng", level: 1, group: "UP" },
+        { en: "Fall", vn: "Giảm", level: 1, group: "DOWN" },
+        { en: "Stay the same", vn: "Giữ nguyên", level: 1, group: "STABLE" },
+        { en: "Slow", vn: "Chậm", level: 1, group: "SLOW" },
+        { en: "Fast", vn: "Nhanh", level: 1, group: "FAST" },
+        { en: "Change", vn: "Thay đổi", level: 1, group: "CHANGE" },
+        { en: "Increase", vn: "Tăng", level: 2, group: "UP" },
+        { en: "Decrease", vn: "Giảm sút", level: 2, group: "DOWN" },
+        { en: "Grow", vn: "Tăng trưởng", level: 2, group: "UP" },
+        { en: "Growth", vn: "Sự tăng trưởng", level: 2, group: "UP" },
+        { en: "Climb", vn: "Tăng (leo thang)", level: 2, group: "UP" },
+        { en: "Drop", vn: "Rớt xuống", level: 2, group: "DOWN" },
+        { en: "Remain stable", vn: "Duy trì sự ổn định", level: 2, group: "STABLE" },
+        { en: "Remain constant", vn: "Không đổi", level: 2, group: "STABLE" },
+        { en: "Fluctuate", vn: "Dao động", level: 2, group: "FLUC" },
+        { en: "Peak", vn: "Đạt đỉnh", level: 2, group: "PEAK" },
+        { en: "Reach a peak", vn: "Đạt mức cao nhất", level: 2, group: "PEAK" },
+        { en: "Hit a low", vn: "Chạm mức thấp", level: 2, group: "LOW" },
+        { en: "Sharp", vn: "Mạnh, đột ngột", level: 2, group: "FAST" },
+        { en: "Gradual", vn: "Dần dần", level: 2, group: "SLOW" },
+        { en: "Steady", vn: "Đều đặn", level: 2, group: "SLOW" },
+        { en: "Slight", vn: "Nhẹ, một chút", level: 2, group: "SLIGHT" },
+        { en: "Account for", vn: "Chiếm tỷ lệ", level: 2, group: "RATIO" },
+        { en: "Make up", vn: "Chiếm tỷ lệ", level: 2, group: "RATIO" },
+        { en: "Surge", vn: "Tăng vọt", level: 3, group: "UP" },
+        { en: "Skyrocket", vn: "Tăng vọt lên", level: 3, group: "UP" },
+        { en: "Plummet", vn: "Lao dốc không phanh", level: 3, group: "DOWN" },
+        { en: "Plunge", vn: "Sụt giảm", level: 3, group: "DOWN" },
+        { en: "Level off", vn: "Chững lại", level: 3, group: "STABLE" },
+        { en: "Plateau", vn: "Đi ngang", level: 3, group: "STABLE" },
+        { en: "Oscillate", vn: "Dao động mạnh", level: 3, group: "FLUC" },
+        { en: "Volatility", vn: "Sự biến động dữ dội", level: 3, group: "FLUC" },
+        { en: "Substantial", vn: "Đáng kể", level: 3, group: "FAST" },
+        { en: "Marginal", vn: "Rất nhỏ", level: 3, group: "SLIGHT" },
+        { en: "Exponential", vn: "Tăng theo cấp số nhân", level: 3, group: "UP" },
+        { en: "Dominate", vn: "Áp đảo, dẫn đầu", level: 3, group: "RATIO" },
+        { en: "Comprise", vn: "Bao gồm, cấu thành", level: 3, group: "RATIO" },
+        { en: "Constitute", vn: "Cấu thành", level: 3, group: "RATIO" }
+    ];
+
+    const sciTechVocab = [
+        { en: "Gadget", vn: "Công cụ, thiết bị", level: 1, group: "DEVICE" },
+        { en: "Theory", vn: "Lý thuyết", level: 1, group: "THEORY" },
+        { en: "Reality", vn: "Thực tế", level: 1, group: "FACT" },
+        { en: "Model", vn: "Mô hình", level: 1, group: "MODEL" },
+        { en: "Perform", vn: "Thực hiện", level: 1, group: "DO" },
+        { en: "Assumption", vn: "Giả định", level: 1, group: "THEORY" },
+        { en: "Truth", vn: "Sự thật", level: 1, group: "FACT" },
+        { en: "Appliance", vn: "Thiết bị gia dụng", level: 1, group: "DEVICE" },
+        { en: "Outdated", vn: "Lỗi thời", level: 2, group: "OLD" },
+        { en: "Old-fashioned", vn: "Cũ kỹ, lỗi thời", level: 2, group: "OLD" },
+        { en: "Carry out", vn: "Tiến hành", level: 2, group: "DO" },
+        { en: "Conduct a study", vn: "Tiến hành nghiên cứu", level: 2, group: "STUDY" },
+        { en: "Smart device", vn: "Thiết bị thông minh", level: 2, group: "DEVICE" },
+        { en: "Practical", vn: "Thực tiễn", level: 2, group: "REAL" },
+        { en: "Framework", vn: "Khuôn khổ", level: 2, group: "MODEL" },
+        { en: "Mechanize", vn: "Cơ giới hóa", level: 2, group: "AUTO" },
+        { en: "Proven", vn: "Đã được chứng minh", level: 2, group: "FACT" },
+        { en: "State-of-the-art", vn: "Hiện đại nhất", level: 3, group: "NEW" },
+        { en: "Cutting-edge software", vn: "Phần mềm tiên tiến", level: 3, group: "NEW" },
+        { en: "Breakthrough", vn: "Đột phá", level: 3, group: "NEW" },
+        { en: "Pioneering", vn: "Tiên phong", level: 3, group: "NEW" },
+        { en: "Outmoded", vn: "Không còn thịnh hành", level: 3, group: "OLD" },
+        { en: "Obsolete", vn: "Lỗi thời, không còn dùng", level: 3, group: "OLD" },
+        { en: "Automate the process", vn: "Tự động hóa quy trình", level: 3, group: "AUTO" },
+        { en: "Test a hypothesis", vn: "Kiểm tra giả thuyết", level: 3, group: "STUDY" },
+        { en: "Empirical research", vn: "Nghiên cứu thực nghiệm", level: 3, group: "STUDY" },
+        { en: "Shift the paradigm", vn: "Thay đổi hệ quy chiếu", level: 3, group: "CHANGE" },
+        { en: "Scientific fact", vn: "Sự thật khoa học", level: 3, group: "FACT" },
+        { en: "Technological innovation", vn: "Đổi mới công nghệ", level: 3, group: "NEW" }
+    ];
+
+    let loggedInUser = null;
+    let vocabularyData = [];
+    let vocabulary = [];
+    
+    // Biến lưu trữ điểm
+    let score = 0; // Điểm của ván hiện tại
+    let recentChartScore = 0; // Điểm mới nhất của màn Chart
+    let recentSciTechScore = 0; // Điểm mới nhất của màn Sci-Tech
+    let bestChartScore = 0; // Kỷ lục màn Chart
+    let bestSciTechScore = 0; // Kỷ lục màn Sci-Tech
+    
+    let lives = 3;
+    let monsterY = 60;
+    let collisionY = 340;
+    let gameInterval;
+    let currentCorrectAnswer = "";
+    let currentWordObj = null;
+    let isRoundActive = false; 
+    let wrongWordsMap = {}; 
+    let currentMode = '';
+    let lastWordEn = ""; 
+    let totalRequiredProgress = 0;
+
+    const monsterEl = document.getElementById("monster");
+    const eggEl = document.getElementById("egg");
+    const wordEl = document.getElementById("word");
+    const scoreEl = document.getElementById("score");
+    const totalScoreEl = document.getElementById("total-score-display");
+    const currentScoreEl = document.getElementById("current-score-display");
+    const livesEl = document.getElementById("lives");
+    const bubbleEl = document.getElementById("speech-bubble");
+    const speechTextEl = document.getElementById("speech-text");
+    const progressBarContainer = document.getElementById("progress-bar-container");
+    const progressBar = document.getElementById("progress-bar");
+    const buttons = [
+        document.getElementById("btn0"), document.getElementById("btn1"),
+        document.getElementById("btn2"), document.getElementById("btn3")
+    ];
+
+    const bgmAudio = document.getElementById("audio-bgm");
+    const chirpAudio = document.getElementById("audio-chirp");
+    const laughAudio = document.getElementById("audio-laugh");
+
+    // Lắng nghe dữ liệu Bảng Xếp Hạng từ Firebase
+    db.collection("leaderboard").orderBy("score", "desc").limit(5).onSnapshot((querySnapshot) => {
+        let html = "";
+        let rank = 1;
+        querySnapshot.forEach((doc) => {
+            html += `
+            <div class="ranking-item">
+                <span class="rank-name">#${rank} ${doc.id}</span>
+                <span class="rank-score">${doc.data().score} 🐥</span>
+            </div>`;
+            rank++;
+        });
+        document.getElementById("ranking-list").innerHTML = html || "<div style='text-align:center; color:#7f8c8d; font-size: 14px;'>Chưa có dữ liệu</div>";
+    });
+
+    window.onload = function() {
+        let savedUser = localStorage.getItem('monsterWebUser');
+        if (savedUser) {
+            db.collection("leaderboard").doc(savedUser).get().then((docSnapshot) => {
+                if(docSnapshot.exists) {
+                    loggedInUser = savedUser;
+                    let data = docSnapshot.data();
+                    
+                    // Lấy lại kỷ lục cũ (hoặc mặc định là 0 nếu chưa có)
+                    bestChartScore = data.bestChart || 0;
+                    bestSciTechScore = data.bestSciTech || 0;
+                    // Phục hồi cho các acc cũ chỉ có field "score" mà chưa tách màn
+                    if (!data.bestChart && !data.bestSciTech && data.score) {
+                        bestChartScore = data.score; 
+                    }
+
+                    document.getElementById("username").value = savedUser;
+                    document.getElementById("passcode").value = data.passcode;
+                    loginSuccess();
+                }
+            }).catch(e => console.log("Lỗi tải dữ liệu", e));
+        }
+    };
+
+    function handleLogin() {
+        let uname = document.getElementById("username").value.trim();
+        let code = document.getElementById("passcode").value.trim();
+        let errorEl = document.getElementById("login-error");
+
+        if(!uname || !code) {
+            errorEl.innerText = "Vui lòng nhập Username và Passcode!";
+            errorEl.style.display = "block";
+            return;
+        }
+
+        let userRef = db.collection("leaderboard").doc(uname);
+        
+        userRef.get().then((docSnapshot) => {
+            if(docSnapshot.exists) {
+                let data = docSnapshot.data();
+                if(data.passcode === code) {
+                    loggedInUser = uname;
+                    
+                    bestChartScore = data.bestChart || 0;
+                    bestSciTechScore = data.bestSciTech || 0;
+                    if (!data.bestChart && !data.bestSciTech && data.score) {
+                        bestChartScore = data.score; 
+                    }
+
+                    localStorage.setItem('monsterWebUser', uname);
+                    loginSuccess();
+                } else {
+                    errorEl.innerText = "Username này đã được sử dụng hoặc sai Passcode!";
+                    errorEl.style.display = "block";
+                }
+            } else {
+                userRef.set({
+                    passcode: code,
+                    score: 0,
+                    bestChart: 0,
+                    bestSciTech: 0
+                }).then(() => {
+                    loggedInUser = uname;
+                    bestChartScore = 0;
+                    bestSciTechScore = 0;
+                    localStorage.setItem('monsterWebUser', uname);
+                    loginSuccess();
+                }).catch((error) => {
+                    console.error("Lỗi khi tạo user: ", error);
+                });
+            }
+        });
+    }
+
+    function loginSuccess() {
+        document.getElementById("login-error").style.display = "none";
+        
+        totalScoreEl.innerText = `Highest Score: ${bestChartScore + bestSciTechScore}`;
+        
+        let recentScore = recentChartScore + recentSciTechScore;
+        if (recentScore > 0) {
+            currentScoreEl.innerText = `Recent Score: ${recentScore}`;
+            currentScoreEl.style.display = "block";
+        }
+        
+        document.getElementById("btn-chart").disabled = false;
+        document.getElementById("btn-scitech").disabled = false;
+        
+        document.getElementById("username").disabled = true;
+        document.getElementById("passcode").disabled = true;
+        document.getElementById("login-btn").style.display = "none";
+    }
+
+    function updateProgressBar() {
+        let currentProgress = vocabulary.reduce((sum, v) => sum + v.correctCount, 0);
+        let remainingPercent = 100 - (currentProgress / totalRequiredProgress * 100);
+        if(remainingPercent < 0) remainingPercent = 0;
+        progressBar.style.width = remainingPercent + "%";
+    }
+
+    function selectMode(mode) {
+        currentMode = mode;
+        document.getElementById("start-screen").style.display = "none";
+        document.getElementById("end-screen").style.display = "none";
+        document.getElementById("ranking-board").style.display = "none"; 
+        
+        score = 0;
+        lives = 3;
+        scoreEl.innerText = score;
+        updateLivesUI();
+        wrongWordsMap = {};
+        lastWordEn = ""; 
+        monsterY = 60;
+        monsterEl.style.top = monsterY + "px";
+        eggEl.innerText = "🥚";
+        wordEl.innerText = "...";
+        buttons.forEach(btn => {
+            btn.style.backgroundColor = "";
+            btn.style.borderColor = "#e74c3c";
+            btn.classList.remove("highlight-correct");
+            btn.disabled = true;
+            btn.innerText = "..."; 
+        });
+
+        if(mode === 'chart') {
+            vocabularyData = chartVocab;
+            progressBar.style.backgroundColor = "#3498db"; 
+        } else {
+            vocabularyData = sciTechVocab;
+            progressBar.style.backgroundColor = "#2ecc71"; 
+        }
+
+        vocabulary = vocabularyData.map(item => ({
+            ...item,
+            used: false,
+            correctCount: 0
+        }));
+
+        totalRequiredProgress = vocabulary.length * 2;
+        progressBarContainer.style.display = "block";
+        updateProgressBar();
+
+        bgmAudio.volume = 0.3; 
+        bgmAudio.play().catch(e => console.log("Can't play audio automatically."));
+
+        showSpeechSequence();
+    }
+
+    function showSpeechSequence() {
+        bubbleEl.style.display = "block";
+        speechTextEl.innerText = "Hehehe!";
+        
+        setTimeout(() => {
+            speechTextEl.innerText = "Những quả trứng này trông ngon quá!";
+            setTimeout(() => {
+                speechTextEl.innerText = "Nếu muốn cứu chúng thì hãy chọn 1 từ đúng nghĩa!";
+                setTimeout(() => {
+                    bubbleEl.style.display = "none";
+                    nextTurn(); 
+                }, 2000);
+            }, 2000);
+        }, 1000);
+    }
+
+    function playSound(audioElement) {
+        audioElement.currentTime = 0; 
+        audioElement.play().catch(e => console.log("Lỗi phát âm thanh"));
+    }
+
+    function updateLivesUI() {
+        let hearts = "";
+        for(let i = 0; i < lives; i++) hearts += "❤️";
+        livesEl.innerText = hearts;
+    }
+
+    function getNextWord() {
+        let allowedLevels = [1];
+        if (score >= 6) allowedLevels.push(2);
+
+        let level2Words = vocabulary.filter(v => v.level === 2);
+        let level2UsedCount = level2Words.filter(v => v.used).length;
+        if (level2Words.length > 0 && (level2UsedCount / level2Words.length) >= 0.9) {
+            allowedLevels.push(3); 
+        }
+
+        let candidates = vocabulary.filter(v => allowedLevels.includes(v.level) && v.correctCount < 2 && v.en !== lastWordEn);
+        
+        if (candidates.length === 0) {
+            candidates = vocabulary.filter(v => allowedLevels.includes(v.level) && v.correctCount < 2);
+        }
+
+        if (candidates.length === 0) return null; 
+
+        let randomIndex = Math.floor(Math.random() * candidates.length);
+        let selectedWord = candidates[randomIndex];
+        selectedWord.used = true; 
+        lastWordEn = selectedWord.en; 
+        
+        return selectedWord;
+    }
+
+    function nextTurn() {
+        isRoundActive = true;
+        monsterY = 60;
+        monsterEl.style.top = monsterY + "px";
+        eggEl.innerText = "🥚";
+
+        buttons.forEach(btn => {
+            btn.style.backgroundColor = "";
+            btn.style.borderColor = "#e74c3c";
+            btn.classList.remove("highlight-correct");
+            btn.disabled = false;
+            btn.innerText = "..."; 
+        });
+
+        currentWordObj = getNextWord();
+        
+        if (!currentWordObj) {
+            clearInterval(gameInterval);
+            bgmAudio.pause();
+            showEndScreen(true);
+            return;
+        }
+
+        wordEl.innerText = currentWordObj.en;
+        currentCorrectAnswer = currentWordObj.vn;
+
+        let wrongAnswers = [];
+        let usedGroups = [currentWordObj.group]; 
+
+        while(wrongAnswers.length < 3) {
+            let randomIndex = Math.floor(Math.random() * vocabulary.length);
+            let candidate = vocabulary[randomIndex];
+            
+            if(!usedGroups.includes(candidate.group) && !wrongAnswers.includes(candidate.vn)) {
+                wrongAnswers.push(candidate.vn);
+                usedGroups.push(candidate.group);
+            }
+        }
+
+        let answers = [currentCorrectAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+
+        buttons.forEach((btn, index) => {
+            btn.innerText = answers[index];
+        });
+
+        clearInterval(gameInterval);
+        gameInterval = setInterval(moveMonster, 158); 
+    }
+
+    function highlightTheCorrectAnswer() {
+        buttons.forEach(btn => {
+            if (btn.innerText === currentCorrectAnswer) {
+                btn.classList.add("highlight-correct");
+            }
+        });
+    }
+
+    function moveMonster() {
+        monsterY += 10; 
+        monsterEl.style.top = monsterY + "px";
+
+        if (monsterY >= collisionY) {
+            clearInterval(gameInterval);
+            
+            if (isRoundActive) {
+                wrongWordsMap[currentWordObj.en] = currentCorrectAnswer;
+            }
+
+            isRoundActive = false; 
+            eggEl.innerText = "💥"; 
+            lives--;
+            updateLivesUI();
+
+            buttons.forEach(btn => btn.disabled = true);
+            highlightTheCorrectAnswer();
+            
+            playSound(laughAudio);
+
+            setTimeout(() => {
+                if (lives > 0) {
+                    nextTurn();
+                } else {
+                    bgmAudio.pause(); 
+                    showEndScreen(false);
+                }
+            }, 2000);
+        }
+    }
+
+    function checkAnswer(btnIndex) {
+        if (!isRoundActive) return; 
+        
+        isRoundActive = false; 
+        buttons.forEach(b => b.disabled = true);
+
+        let btn = buttons[btnIndex];
+        let chosenAnswer = btn.innerText;
+
+        if (chosenAnswer === currentCorrectAnswer) {
+            clearInterval(gameInterval);
+            eggEl.innerText = "🐣"; 
+            
+            score++;
+            scoreEl.innerText = score;
+            currentWordObj.correctCount++;
+
+            // THUẬT TOÁN LƯU ĐIỂM KỶ LỤC TỪNG MÀN
+            let isNewRecord = false;
+            if (currentMode === 'chart' && score > bestChartScore) {
+                bestChartScore = score;
+                isNewRecord = true;
+            } else if (currentMode === 'scitech' && score > bestSciTechScore) {
+                bestSciTechScore = score;
+                isNewRecord = true;
+            }
+
+            // Chỉ cập nhật lên Cloud nếu người chơi phá kỷ lục cũ của chính họ
+            if (loggedInUser && isNewRecord) {
+                db.collection("leaderboard").doc(loggedInUser).update({
+                    score: bestChartScore + bestSciTechScore,
+                    bestChart: bestChartScore,
+                    bestSciTech: bestSciTechScore
+                });
+            }
+
+            updateProgressBar();
+
+            btn.classList.add("highlight-correct");
+            playSound(chirpAudio);
+
+            setTimeout(nextTurn, 1000); 
+        } else {
+            wrongWordsMap[currentWordObj.en] = currentCorrectAnswer;
+
+            btn.style.backgroundColor = "#95a5a6";
+            btn.style.borderColor = "#7f8c8d";
+            btn.style.color = "#ecf0f1";
+            btn.innerText = "❌";
+
+            highlightTheCorrectAnswer();
+        }
+    }
+
+    function showEndScreen(isWin) {
+        progressBarContainer.style.display = "none"; 
+        
+        // Cập nhật điểm recent cho màn vừa chơi
+        if (currentMode === 'chart') {
+            recentChartScore = score;
+        } else if (currentMode === 'scitech') {
+            recentSciTechScore = score;
+        }
+
+        const endScreen = document.getElementById('end-screen');
+        const endTitle = document.getElementById('end-title');
+        const endMessage = document.getElementById('end-message');
+        const endMistakes = document.getElementById('end-mistakes');
+        const mistakesList = document.getElementById('mistakes-list');
+        
+        endScreen.style.display = 'flex';
+        
+        if (isWin) {
+            endTitle.innerText = "🎉 CHÚC MỪNG! 🎉";
+            endTitle.style.color = "#2ecc71";
+            endMessage.innerText = "Bạn đã cứu được hết số gà con 🐥 tuyệt vời quá!";
+            endMistakes.style.display = 'none';
+            launchConfetti();
+        } else {
+            endTitle.innerText = "GAME OVER";
+            endTitle.style.color = "#e74c3c";
+            endMessage.innerHTML = `Bạn đã cứu được <b>${score}</b> 🐥.<br>Hãy chơi lại để cứu hết số gà con nào!`;
+            
+            const mistakes = Object.keys(wrongWordsMap);
+            if (mistakes.length > 0) {
+                endMistakes.style.display = 'block';
+                mistakesList.innerHTML = mistakes.map(en => `
+                    <div class="mistake-bubble">
+                        ${en} ➔ ${wrongWordsMap[en]}
+                    </div>
+                `).join('');
+            } else {
+                endMistakes.style.display = 'none';
+            }
+        }
+    }
+
+    function goHome() {
+        document.getElementById('end-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'flex';
+        document.getElementById('ranking-board').style.display = 'block'; 
+        
+        // Cập nhật lại UI hiển thị điểm sau khi chơi xong
+        totalScoreEl.innerText = `Highest Score: ${bestChartScore + bestSciTechScore}`;
+        
+        let recentScore = recentChartScore + recentSciTechScore;
+        currentScoreEl.innerText = `Recent Score: ${recentScore}`;
+        currentScoreEl.style.display = "block";
+    }
+
+    function playAgain() {
+        selectMode(currentMode);
+    }
+
+    function launchConfetti() {
+        const container = document.getElementById('game-board');
+        const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e84393'];
+        
+        for(let i=0; i<80; i++) {
+            let conf = document.createElement('div');
+            conf.classList.add('confetti');
+            conf.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+            
+            let startX = Math.random() * 100;
+            conf.style.left = startX + '%';
+            conf.style.top = '-20px';
+            
+            let fallDuration = Math.random() * 4 + 6; 
+            conf.style.transition = `top ${fallDuration}s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform ${fallDuration}s ease-in-out`;
+            
+            container.appendChild(conf);
+            
+            setTimeout(() => {
+                conf.style.top = '120%';
+                
+                let scatterX = (Math.random() - 0.5) * 400; 
+                let rotation = Math.random() * 1080; 
+                
+                conf.style.transform = `rotate(${rotation}deg) translateX(${scatterX}px)`;
+            }, 50);
+
+            setTimeout(() => {
+                if(conf.parentNode) conf.parentNode.removeChild(conf);
+            }, fallDuration * 1000 + 100);
+        }
+    }
+</script>
+
+</body>
+</html>
